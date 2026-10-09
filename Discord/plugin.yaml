@@ -1,0 +1,4 @@
+name: agent-live
+version: 0.1.0
+description: Private Agent Live records and live Discord voice through the existing Hermes bot.
+author: Local

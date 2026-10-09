@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AgentLiveKeychainGroup</key>
+	<string>$(AGENT_LIVE_KEYCHAIN_GROUP)</string>
+	<key>AgentLiveAppGroup</key>
+	<string>$(AGENT_LIVE_APP_GROUP)</string>
+	<key>AgentLiveBroadcastBundle</key>
+	<string>$(AGENT_LIVE_BROADCAST_BUNDLE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Agent Live</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Agent Live</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.18.0</string>
+	<key>CFBundleVersion</key>
+	<string>18</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>カメラをオンにしたときだけ、映像をAIへ共有し、選択した場合は記録します。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>記録を開始した会話の保存と、AIとの音声会話にマイクを使います。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>会話の途中から素早く文字を表示し、話し終わった内容をAIへ伝えます。端末内の日本語認識を使用します。</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>

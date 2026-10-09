@@ -1,0 +1,17 @@
+[Unit]
+Description=Agent Live private voice and recording bridge
+After=network-online.target agent-live-hermes-api.service
+Wants=network-online.target agent-live-hermes-api.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/agent-live/server.env
+Environment=PYTHONPATH=%h/.hermes/hermes-agent
+WorkingDirectory=%h/.local/share/agent-live-server
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

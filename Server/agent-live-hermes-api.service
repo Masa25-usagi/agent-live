@@ -1,0 +1,17 @@
+[Unit]
+Description=Agent Live app-only Hermes API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/agent-live/server.env
+Environment=PYTHONPATH=%h/.hermes/hermes-agent
+WorkingDirectory=%h/.local/share/agent-live-server
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python hermes_api.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target
