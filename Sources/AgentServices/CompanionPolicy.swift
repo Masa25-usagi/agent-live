@@ -5,11 +5,19 @@ public enum CompanionAddressing {
     /// A spoken call to the companion requests a reply; mentioning its name in
     /// background speech or a quote doesn't grant that request or any action.
     private static let address = try! NSRegularExpression(pattern:
-        #"^(?:(?:ねえ|ねぇ|ねー|もしもし)[\s、,。!?！？]*)?(?:ジェブ|ジェヴ|ジェフ|じぇぶ|jev|jeb)(?=[\s、,。!?！？]|$|こんにちは|こんばんは|おはよう|返事|教えて|聞いて|お願い|ありがとう|今)"#)
+        #"^(?:(?:ねえ|ねぇ|ねー|もしもし)[\s、,。!?！？]*)?(?:(?:こんにちは|こんばんは|おはよう(?:ございます)?)[\s、,。!?！？]*)?(?:ジェブ|ジェヴ|ジェフ|じぇぶ|ジブ|j\s*e\s*[vb])(?=[\s、,。!?！？]|$|こんにちは|こんばんは|おはよう|返事|返答|教えて|聞いて|聞こえ|お願い|ありがとう|今|短く|ねえ|ねぇ)"#)
+    // A short greeting plus an explicit reply request is still directed speech when
+    // recognition omits the name or produces one of the observed phonetic mistakes.
+    // Those mistakes alone must never become wake words or permission for actions.
+    private static let greetingReply = try! NSRegularExpression(pattern:
+        #"^(?:(?:ねえ|ねぇ|ねー|もしもし)[\s、,。!?！？]*)?(?:こんにちは|こんばんは|おはよう(?:ございます)?)[\s、,。!?！？]*(?:(?:ジョブ|ジェイプ|ジープ|全部|ja\s*部)[\s、,。!?！？]*)?(?:短く|声で|一言)?(?:返事|返答|応答)(?:して(?:ください)?|をして(?:ください)?)[\s、,。!?！？]*$"#)
     public static func requestsReply(_ text: String) -> Bool {
         let normalized = text.folding(options: [.widthInsensitive, .caseInsensitive], locale: Locale(identifier: "ja-JP"))
             .lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        return address.firstMatch(in: normalized, range: NSRange(normalized.startIndex..., in: normalized)) != nil
+        guard !normalized.contains("「"), !normalized.contains("\""),
+              !["って言", "と言っ", "という発言", "という例"].contains(where: normalized.contains) else { return false }
+        let range = NSRange(normalized.startIndex..., in: normalized)
+        return address.firstMatch(in: normalized, range: range) != nil || greetingReply.firstMatch(in: normalized, range: range) != nil
     }
 }
 

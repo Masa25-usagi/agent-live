@@ -33,6 +33,7 @@ final class FastModeFixture: URLProtocol {
     static var judges: [FastModeFixture] = [], replies: [FastModeFixture] = []
     static var replyCount = 0, draftCount = 0, ttsCount = 0
     static var holdReplies = false
+    static var speakScore = 0.95, draftScore = 0.95
     private var cancelled = false
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -62,7 +63,8 @@ final class FastModeFixture: URLProtocol {
     }
     static func releaseJudges() {
         let pending = lock.withLock { let value = judges; judges = []; return value }
-        let data = try! JSONSerialization.data(withJSONObject: ["scores": ["speak": 0.95, "draft": 0.95, "research": 0.0, "memory": 0.0, "unsafe": 0.0, "stop": 0.0]])
+        let scores = lock.withLock { ["speak": speakScore, "draft": draftScore, "research": 0.0, "memory": 0.0, "unsafe": 0.0, "stop": 0.0] }
+        let data = try! JSONSerialization.data(withJSONObject: ["scores": scores])
         pending.forEach { $0.deliver(data) }
     }
     static func releaseReplies() {

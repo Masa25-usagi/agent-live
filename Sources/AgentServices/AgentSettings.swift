@@ -36,7 +36,7 @@ public enum AgentSpeechProvider: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-public struct ConversationModel: Codable, Identifiable, Sendable {
+public struct ConversationModel: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let title: String
     public init(id: String, title: String) { self.id = id; self.title = title }
@@ -72,6 +72,8 @@ public struct AgentSettings: Codable {
     public var geminiFastMode = false
     public var geminiOnDemand = true
     public var geminiIdleSeconds: Double = 60
+    public var economyPreferences: [String: Bool] = [:]
+    public var pendingEconomyUpdates: [String: Bool] = [:]
     public var companionEnabled = true
     public var automaticDrafts = true
     public var objective = "日々の会話を理解し、必要なときに短く助言し、調査や案・試作品の作成を手伝う"
@@ -81,6 +83,7 @@ public struct AgentSettings: Codable {
         case endpoint, voice, liveConversation, recordVideo, autoRecord, autoResearch, offlineMegabytes
         case agentProvider, agentModel, voiceModels, speechProvider
         case onDeviceTranscription, economyFastMode, directJev, directGemini, geminiFastMode, geminiOnDemand, geminiIdleSeconds, companionEnabled, automaticDrafts, objective
+        case economyPreferences, pendingEconomyUpdates
     }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -102,6 +105,8 @@ public struct AgentSettings: Codable {
         geminiFastMode = try values.decodeIfPresent(Bool.self, forKey: .geminiFastMode) ?? geminiFastMode
         geminiOnDemand = try values.decodeIfPresent(Bool.self, forKey: .geminiOnDemand) ?? geminiOnDemand
         geminiIdleSeconds = try values.decodeIfPresent(Double.self, forKey: .geminiIdleSeconds) ?? geminiIdleSeconds
+        economyPreferences = try values.decodeIfPresent([String: Bool].self, forKey: .economyPreferences) ?? [:]
+        pendingEconomyUpdates = try values.decodeIfPresent([String: Bool].self, forKey: .pendingEconomyUpdates) ?? [:]
         companionEnabled = try values.decodeIfPresent(Bool.self, forKey: .companionEnabled) ?? companionEnabled
         automaticDrafts = try values.decodeIfPresent(Bool.self, forKey: .automaticDrafts) ?? automaticDrafts
         objective = try values.decodeIfPresent(String.self, forKey: .objective) ?? objective

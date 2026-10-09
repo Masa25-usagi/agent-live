@@ -3,6 +3,11 @@ import Combine
 import MeetingCore
 import MeetingLive
 
+private struct SavedModelCatalog: Codable {
+    let endpoint: String
+    let catalog: ConversationCatalog
+}
+
 public struct LiveEntry: Identifiable {
     public let id: String
     public var source: String
@@ -62,6 +67,7 @@ public final class AgentSession: ObservableObject {
     @Published public private(set) var pendingBytes = 0
     @Published public private(set) var costSaving = true
     @Published public private(set) var savingCostSettings = false
+    @Published public private(set) var costSettingStatus = ""
     @Published public private(set) var catalog: ConversationCatalog?
     @Published public private(set) var loadingModels = false
     @Published public private(set) var modelMessage = ""
@@ -129,6 +135,11 @@ public final class AgentSession: ObservableObject {
     private var workspaceSession: String?
     private var pendingStops: [String: String] = [:]
     private var maintaining = false
+    private var modelTask: Task<Void, Never>?
+    private var modelEpoch = UUID()
+    private var catalogEndpoint: String?
+    private var costRetryAt = Date.distantPast
+    private var lastJudgmentError: String?
 
     public init(root: URL? = nil, bridge: BridgeClient? = nil, voiceFactory: ((VoiceProvider, URLRequest) -> LiveConversationProvider)? = nil, automaticMaintenance: Bool = true, nativeTranscription: Bool = true) {
         injectedBridge = bridge; self.voiceFactory = voiceFactory; self.nativeTranscription = nativeTranscription
@@ -160,19 +171,34 @@ public final class AgentSession: ObservableObject {
         }
     }
     public var pendingSummary: String { ByteCountFormatter.string(fromByteCount: Int64(pendingBytes), countStyle: .file) }
-    deinit { maintenance?.cancel(); agentTask?.cancel(); connectionTask?.cancel(); speechTask?.cancel(); fastReplyTask?.cancel(); geminiIdleTask?.cancel(); transcriptionTask?.cancel(); reactionTask?.cancel(); behaviorTask?.cancel() }
+    deinit { maintenance?.cancel(); agentTask?.cancel(); connectionTask?.cancel(); speechTask?.cancel(); fastReplyTask?.cancel(); geminiIdleTask?.cancel(); transcriptionTask?.cancel(); reactionTask?.cancel(); behaviorTask?.cancel(); modelTask?.cancel() }
     public var paired: Bool { bridge != nil }
     public var voiceName: String { settings.voice.title }
     public var conversationEnabled: Bool { connected || connecting || (recording && settings.liveConversation && settings.voice == .hermes) }
 
     public func loadModels(refresh: Bool = false) async {
-        guard let bridge, !loadingModels else { return }
-        loadingModels = true; defer { loadingModels = false }
-        do {
-            let value = try await bridge.json("models", query: refresh ? [URLQueryItem(name: "refresh", value: "1")] : nil)
-            catalog = try JSONDecoder().decode(ConversationCatalog.self, from: JSONSerialization.data(withJSONObject: value))
-            modelMessage = ""
-        } catch { modelMessage = "モデル一覧を取得できませんでした。現在の選択は保持しています。" }
+        if let modelTask { await modelTask.value; return }
+        guard let bridge else { return }
+        loadingModels = true; modelEpoch = UUID(); let token = modelEpoch
+        let endpoint = bridge.baseURL.absoluteString
+        // Navigation cancellation must not discard discovery shared by the settings and model screens.
+        let task = Task { @MainActor [weak self] in
+            defer { if self?.modelEpoch == token { self?.loadingModels = false; self?.modelTask = nil } }
+            do {
+                let value = try await bridge.json("models", query: refresh ? [URLQueryItem(name: "refresh", value: "1")] : nil)
+                let catalog = try JSONDecoder().decode(ConversationCatalog.self, from: JSONSerialization.data(withJSONObject: value))
+                guard let self, self.modelEpoch == token, self.bridge?.baseURL.absoluteString == endpoint, !Task.isCancelled else { return }
+                self.catalog = catalog; self.modelMessage = ""
+                let cached = SavedModelCatalog(endpoint: endpoint, catalog: catalog)
+                let file = self.archive.root.appendingPathComponent("model-catalog.json")
+                try? JSONEncoder().encode(cached).write(to: file, options: .atomic)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+            } catch {
+                guard let self, self.modelEpoch == token, !Task.isCancelled else { return }
+                self.modelMessage = "モデル一覧を更新できませんでした。Tailscaleとサーバー接続を確認してください。保存済みの候補と現在の選択は保持しています。"
+            }
+        }
+        modelTask = task; await task.value
     }
     public func selectVoice(_ value: VoiceProvider) {
         guard settings.voice != value else { return }
@@ -261,14 +287,32 @@ public final class AgentSession: ObservableObject {
         await checkConnection()
     }
     public func saveCostSettings(enabled: Bool) async {
-        guard let bridge, !savingCostSettings else { return }
+        guard let bridge else { return }
+        let endpoint = bridge.baseURL.absoluteString
+        costSaving = enabled; settings.economyPreferences[endpoint] = enabled
+        settings.pendingEconomyUpdates[endpoint] = enabled; settings.save()
+        costRetryAt = .distantPast; costSettingStatus = "端末に保存済み · サーバーへ反映中"
+        if settings.voice != .hermes { restartConversation() }
+        await flushCostSettings()
+    }
+    private func flushCostSettings() async {
+        guard let bridge, !savingCostSettings, Date() >= costRetryAt else { return }
+        let endpoint = bridge.baseURL.absoluteString
+        guard settings.pendingEconomyUpdates[endpoint] != nil else { return }
         savingCostSettings = true; defer { savingCostSettings = false }
-        do {
-            let result = try await bridge.json("settings/economy", method: "POST", body: ["enabled": enabled])
-            costSaving = result["enabled"] as? Bool ?? costSaving
-            error = nil
-            if settings.voice != .hermes { restartConversation() }
-        } catch { self.error = "節約設定を保存できませんでした。接続を確認してください。" }
+        while let wanted = settings.pendingEconomyUpdates[endpoint], self.bridge?.baseURL.absoluteString == endpoint {
+            do {
+                let result = try await bridge.json("settings/economy", method: "POST", body: ["enabled": wanted])
+                guard result["enabled"] as? Bool == wanted else { throw BridgeError.malformedResponse }
+                if settings.pendingEconomyUpdates[endpoint] == wanted { settings.pendingEconomyUpdates.removeValue(forKey: endpoint) }
+                settings.save()
+                if self.bridge?.baseURL.absoluteString == endpoint { costSettingStatus = settings.pendingEconomyUpdates[endpoint] == nil ? "サーバーへ反映済み" : "最新の設定を反映中" }
+            } catch {
+                costRetryAt = Date().addingTimeInterval(30)
+                if self.bridge?.baseURL.absoluteString == endpoint { costSettingStatus = "端末に保存済み · サーバー未反映。Tailscaleの接続後に反映します" }
+                return
+            }
+        }
     }
     public func saveHostMode(_ mode: String) async {
         guard ["main", "dedicated"].contains(mode), let bridge, !savingHostMode else { return }
@@ -282,21 +326,35 @@ public final class AgentSession: ObservableObject {
     private func refreshBridge() {
         archive.maximumPendingBytes = settings.offlineMegabytes * 1_024 * 1_024
         bridge = injectedBridge ?? (try? BridgeClient(endpoint: settings.endpoint, token: DeviceCredential.read() ?? ""))
+        let endpoint = bridge?.baseURL.absoluteString
+        if endpoint != catalogEndpoint {
+            modelEpoch = UUID(); modelTask?.cancel(); modelTask = nil; loadingModels = false
+            catalogEndpoint = endpoint; catalog = nil; modelMessage = ""; costRetryAt = .distantPast
+            if let data = try? Data(contentsOf: archive.root.appendingPathComponent("model-catalog.json")),
+               let cached = try? JSONDecoder().decode(SavedModelCatalog.self, from: data), cached.endpoint == endpoint { catalog = cached.catalog }
+            costSaving = endpoint.flatMap { settings.economyPreferences[$0] } ?? true
+            costSettingStatus = endpoint.flatMap { settings.pendingEconomyUpdates[$0] } == nil ? "" : "端末に保存済み · サーバー未反映"
+        }
         if archive.pendingBytes == 0, !recording { syncStatus = bridge == nil ? "設定からサーバーへ接続してください" : "記録は開始ボタンを押してから" }
     }
     public func checkConnection() async {
         guard let bridge else { error = "設定からサーバーへ接続してください。"; return }
         do {
             let result = try await bridge.json("health")
+            guard self.bridge?.baseURL.absoluteString == bridge.baseURL.absoluteString else { return }
             health = ["agent": result["agent"] as? Bool ?? false, "drive": result["drive"] as? Bool ?? false, "stt": result["stt"] as? Bool ?? false]
             for (key, value) in result["live"] as? [String: Bool] ?? [:] { health[key] = value }
-            if let config = result["economy"] as? [String: Any] { costSaving = config["enabled"] as? Bool ?? costSaving }
+            let endpoint = bridge.baseURL.absoluteString
+            if let config = result["economy"] as? [String: Any], let enabled = config["enabled"] as? Bool, settings.pendingEconomyUpdates[endpoint] == nil {
+                costSaving = enabled; settings.economyPreferences[endpoint] = enabled; settings.save()
+            }
             let previousHostMode = hostMode
             if let config = result["host_policy"] as? [String: Any] { hostMode = config["mode"] as? String ?? "main"; hostName = config["host_name"] as? String ?? "" }
             if recording, settings.companionEnabled, previousHostMode != hostMode { refreshBehaviorPolicy() }
             health["jev"] = result["jev"] as? Bool ?? false
             error = nil
             if !recording { status = "接続できました。記録を始められます" }
+            costRetryAt = .distantPast; await flushCostSettings()
         } catch { health = [:]; self.error = BridgeClient.connectionMessage(error) }
     }
 
@@ -746,6 +804,11 @@ public final class AgentSession: ObservableObject {
                         let result = try await bridge.companionJudge(["session_id": self.sessionID, "event_id": turn.id,
                             "text": turn.text, "context": String(context.suffix(4_000)), "policy": judgePolicy], direct: self.usesDirectJev, hostMode: self.hostMode)
                         judgment = try CompanionJudgment(result, allowDrafts: self.settings.automaticDrafts && self.behaviorPolicy != nil)
+                        if let previous = self.lastJudgmentError, self.error == previous { self.error = nil }
+                        self.lastJudgmentError = nil
+                        if self.behaviorStatus == "Jevの接続を確認してください" {
+                            self.behaviorStatus = self.behaviorPolicy == nil ? "Jevが呼びかけと質問を判断します" : "Hermesの基準でJevが判断します"
+                        }
                     } catch {
                         guard turn.requestedReply, turn.respond else { throw error }
                         self.behaviorStatus = "Jevの接続を待っています。自動判断は保留し、呼びかけに返答します。"
@@ -780,8 +843,8 @@ public final class AgentSession: ObservableObject {
                 } catch {
                     guard self.epoch == token, !Task.isCancelled else { return }
                     if let (session, request) = self.reactionRequest { self.queueStop(session: session, request: request) }; self.reactionRequest = nil
-                    self.error = stage == "jev" ? "Jevの判断に接続できませんでした。発言は記録に残しています。" : "Hermesの返答に接続できませんでした。モデルやサーバーの接続を確認してください。発言は記録に残しています。"
-                    if stage == "jev" { self.behaviorStatus = "Jevの接続を確認してください" }; self.reacting = false
+                    self.error = stage == "jev" ? BridgeClient.companionFailureMessage(error) : "Hermesの返答に接続できませんでした。モデルやサーバーの接続を確認してください。発言は記録に残しています。"
+                    if stage == "jev" { self.lastJudgmentError = self.error; self.behaviorStatus = "Jevの接続を確認してください" }; self.reacting = false
                 }
             }
         }
@@ -883,6 +946,7 @@ public final class AgentSession: ObservableObject {
         do { try archive.sealDueSegments() } catch { if recording { storageFailure(error) } }
         pendingBytes = archive.pendingBytes
         guard let bridge else { syncStatus = pendingBytes == 0 && !recording ? "設定からサーバーへ接続してください" : "端末に保存中。サーバー未接続"; return }
+        await flushCostSettings()
         await flushStops()
         if recording, receivesSharedScreen, let jpeg = try? await bridge.latestFrame(sessionID: sessionID) { visualFrame = jpeg }
         resumeWork()

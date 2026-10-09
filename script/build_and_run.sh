@@ -17,7 +17,7 @@ mkdir -p "$TASK_STAGE/AgentLive.app/Contents/MacOS" "$(dirname "$TASK_APP")"
 cp "$TASK_BINARY" "$TASK_STAGE/AgentLive.app/Contents/MacOS/AgentLive"
 python3 - "$TASK_STAGE/AgentLive.app/Contents/Info.plist" "$TASK_ROOT" <<'PY'
 import plistlib,sys
-p={'CFBundlePackageType':'APPL','CFBundleExecutable':'AgentLive','CFBundleIdentifier':'local.agentlive.mac','CFBundleName':'Agent Live','CFBundleDisplayName':'Agent Live','CFBundleShortVersionString':'0.18.0','CFBundleVersion':'18','LSMinimumSystemVersion':'15.0','NSPrincipalClass':'NSApplication','NSMicrophoneUsageDescription':'記録を開始した会話の保存と、AIとの音声会話にマイクを使います。','NSCameraUsageDescription':'オンにしたカメラの映像をAIへ共有し、選択した場合は記録します。','NSSpeechRecognitionUsageDescription':'話した内容を端末内で素早く文字にし、相棒への会話に使います。','MeetingProjectPath':sys.argv[2]}
+p={'CFBundlePackageType':'APPL','CFBundleExecutable':'AgentLive','CFBundleIdentifier':'local.agentlive.mac','CFBundleName':'Agent Live','CFBundleDisplayName':'Agent Live','CFBundleShortVersionString':'0.20.0','CFBundleVersion':'20','LSMinimumSystemVersion':'15.0','NSPrincipalClass':'NSApplication','NSMicrophoneUsageDescription':'記録を開始した会話の保存と、AIとの音声会話にマイクを使います。','NSCameraUsageDescription':'オンにしたカメラの映像をAIへ共有し、選択した場合は記録します。','NSSpeechRecognitionUsageDescription':'話した内容を端末内で素早く文字にし、相棒への会話に使います。','MeetingProjectPath':sys.argv[2]}
 with open(sys.argv[1],'wb') as f: plistlib.dump(p,f)
 PY
 codesign --force --sign - --identifier local.agentlive.mac "$TASK_STAGE/AgentLive.app" >/dev/null

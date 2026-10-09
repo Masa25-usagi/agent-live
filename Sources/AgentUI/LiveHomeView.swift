@@ -122,7 +122,7 @@ public struct LiveHomeView: View {
                 Label(screen ? "画面を共有中" : "カメラを共有中", systemImage: screen ? "rectangle.on.rectangle" : "video").font(.subheadline)
             } else {
                 orb.frame(width: 220, height: 220).padding(.vertical, 8)
-                Text(session.reacting ? "返答を考えています" : session.connecting ? "接続しています" : session.recording ? "記録しています" : session.paired ? "声で話しかける" : "接続を設定してください").font(.title3.weight(.medium)).multilineTextAlignment(.center)
+                Text(session.reacting ? "発言を確認しています" : session.connecting ? "接続しています" : session.recording ? "記録しています" : session.paired ? "声で話しかける" : "接続を設定してください").font(.title3.weight(.medium)).multilineTextAlignment(.center)
             }
             Text(session.recording ? (session.localTranscriptionActive ? "聞いています · 端末内の文字起こし" : "声で話す · 必要なときに見せる") : "声で話す、あなたの相棒")
                 .font(.caption).foregroundStyle(ink.opacity(0.5))

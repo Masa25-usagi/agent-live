@@ -476,7 +476,7 @@ final class CompanionFixture: URLProtocol {
     check(!CompanionAddressing.requestsReply("「ジェブ、こんにちは」と引用") && !CompanionAddressing.requestsReply("ジェブの話をしていた"), "Quotes and third-person mentions are not direct reply requests")
 }
 
-do { try settingsChecks(); try recoveryChecks(); mixerChecks(); interruptionChecks(); try speechAudioChecks(); try await sessionChecks(); try await hotSwitchChecks(); try await workLifecycleChecks(); try await companionChecks(); try fastPolicyChecks(); try await fastModeChecks(); try await geminiCallChecks(); try await videoChecks() }
+do { try settingsChecks(); try recoveryChecks(); mixerChecks(); interruptionChecks(); try speechAudioChecks(); try await sessionChecks(); try await hotSwitchChecks(); try await workLifecycleChecks(); try await companionChecks(); try fastPolicyChecks(); try await fastModeChecks(); try await geminiCallChecks(); try await videoChecks(); try await connectionSettingsChecks(); try await wakeRecognitionChecks() }
 catch { failures += 1; print("FAIL: extended checks: \(error)") }
 print("Agent checks complete: \(failures) failures")
 exit(failures == 0 ? 0 : 1)

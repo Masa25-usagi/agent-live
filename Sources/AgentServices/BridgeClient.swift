@@ -33,7 +33,7 @@ public final class BridgeClient: @unchecked Sendable {
     public func request(_ path: String, method: String = "GET") -> URLRequest {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = method; request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = path == "health" ? 12 : path == "context" ? 8 : path == "companion/judge" ? 12 : path == "models" ? 35 : (path.hasPrefix("agent") || path.hasPrefix("live/")) ? 20 : 150
+        request.timeoutInterval = path == "settings/economy" ? 6 : path == "health" ? 12 : path == "context" ? 8 : path == "companion/judge" ? 12 : path == "models" ? 35 : (path.hasPrefix("agent") || path.hasPrefix("live/")) ? 20 : 150
         return request
     }
     public static func connectionMessage(_ error: Error) -> String {
@@ -57,6 +57,14 @@ public final class BridgeClient: @unchecked Sendable {
             if URLError(code).localizedDescription == message { return connectionMessage(URLError(code)) }
         }
         return message
+    }
+    public static func companionFailureMessage(_ error: Error) -> String {
+        if (error as NSError).domain == NSURLErrorDomain { return connectionMessage(error) }
+        if case BridgeError.rejected(let code) = error {
+            if code == 401 { return "サーバーの認証を確認してください。設定から再接続できます。発言は記録に残しています。" }
+            if code == 503 { return "Jevのサービスが応答していません。自動判断を保留し、発言は記録に残しています。" }
+        }
+        return "Jevの判断を確認できませんでした。自動判断を保留し、発言は記録に残しています。"
     }
     public func json(_ path: String, method: String = "GET", body: [String: Any]? = nil, query: [URLQueryItem]? = nil) async throws -> [String: Any] {
         var req = request(path, method: method)

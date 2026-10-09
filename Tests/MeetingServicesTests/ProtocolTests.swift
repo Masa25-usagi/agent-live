@@ -1004,10 +1004,11 @@ final class ProtocolTests {
 
     /// CLIエラー時のstderrサニタイズ（秘密情報マスクとtail抽出）テスト
     func testCLISanitizesStderrDiagnostics() {
+        let syntheticAPIKey = "sk-" + String(repeating: "x", count: 40)
         let raw = """
         [INFO] Loading credentials
         Authorization: Bearer secret_token_value_12345
-        api_key: sk-proj-1234567890abcdefghijklmn
+        api_key: \(syntheticAPIKey)
         ts_key = ts-abcdef1234567890
         Error: Model 'custom-model' failed to initialize.
         Stack trace line 1
@@ -1015,7 +1016,7 @@ final class ProtocolTests {
         """
         let sanitized = CLIOutputDiagnostics.sanitize(raw, maxBytes: 500)
         expectFalse(sanitized.contains("secret_token_value_12345"))
-        expectFalse(sanitized.contains("sk-proj-1234567890abcdefghijklmn"))
+        expectFalse(sanitized.contains(syntheticAPIKey))
         expectFalse(sanitized.contains("ts-abcdef1234567890"))
         expectTrue(sanitized.contains("[REDACTED]"))
         expectTrue(sanitized.contains("Error: Model 'custom-model' failed to initialize."))

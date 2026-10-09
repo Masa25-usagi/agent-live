@@ -30,9 +30,9 @@ struct ConnectionSettingsView: View {
                         }
                         NavigationLink {
                             ModelSelectionView(title: "会話モデル", models: agentModels, selected: session.settings.agentModel,
-                                defaultLabel: session.settings.agentProvider == .current ? "Hermesの設定を使う" : "", choose: { session.selectAgentModel($0) })
+                                defaultLabel: session.settings.agentProvider == .current ? "Hermesの設定を使う" : "", loading: session.loadingModels, message: modelStatus,
+                                reload: { await session.loadModels(refresh: $0) }, choose: { session.selectAgentModel($0) })
                         } label: { settingRow("モデル", value: session.loadingModels ? "一覧を読み込んでいます" : session.settings.agentModel.isEmpty ? "選択してください" : session.settings.agentModel) }
-                        .disabled(session.loadingModels)
                     } else {
                         if session.settings.voice == .gemini {
                             Picker("会話が途切れたら切断", selection: Binding(get: { session.settings.geminiIdleSeconds }, set: { session.setGeminiIdleSeconds($0) })) {
@@ -51,12 +51,13 @@ struct ConnectionSettingsView: View {
                             }
                         }
                         NavigationLink {
-                            ModelSelectionView(title: "Liveモデル", models: voiceModels, selected: session.settings.selectedVoiceModel, choose: { session.selectVoiceModel($0) })
+                            ModelSelectionView(title: "Liveモデル", models: voiceModels, selected: session.settings.selectedVoiceModel,
+                                loading: session.loadingModels, message: session.modelMessage, reload: { await session.loadModels(refresh: $0) }, choose: { session.selectVoiceModel($0) })
                         } label: { settingRow("モデル", value: session.loadingModels ? "一覧を読み込んでいます" : session.settings.selectedVoiceModel) }
-                        .disabled(session.loadingModels)
                     }
                     Toggle("節約モード", isOn: Binding(get: { session.costSaving }, set: { enabled in Task { await session.saveCostSettings(enabled: enabled) } }))
-                        .disabled(session.savingCostSettings || !session.paired)
+                        .disabled(!session.paired)
+                    if !session.costSettingStatus.isEmpty { Text(session.costSettingStatus).font(.caption).foregroundStyle(.secondary) }
                     if (session.settings.voice == .hermes && session.settings.economyFastMode) || (session.settings.voice == .gemini && session.settings.geminiFastMode) {
                         NavigationLink("Jevの接続（試験）") {
                             Form {
@@ -171,7 +172,7 @@ struct ConnectionSettingsView: View {
                 }.disabled(apiKey.isEmpty || !session.paired || savingProvider || session.recording)
                 if !providerMessage.isEmpty { Text(providerMessage).font(.caption).foregroundStyle(.secondary) }
             }
-            Text("Macまたはサーバーと同じTailscaleへ接続してください。節約モードは無音・映像の重複・不要な調査を減らします。月1,000円は目安で、請求額の上限ではありません。").font(.caption).foregroundStyle(.secondary)
+            Text("Macまたはサーバーと同じTailscaleへ接続してください。節約モードは無音・映像の重複・不要な調査を減らします。請求額の上限を設定する機能ではありません。").font(.caption).foregroundStyle(.secondary)
         }.navigationTitle("接続")
     }
     private func settingRow(_ label: String, value: String) -> some View {
@@ -182,4 +183,9 @@ struct ConnectionSettingsView: View {
     }
     private var voiceModels: [ConversationModel] { session.catalog?.live[session.settings.voice.rawValue] ?? [] }
     private var agentModels: [ConversationModel] { session.catalog?.providers.first(where: { $0.id == session.settings.agentProvider.rawValue })?.models ?? [] }
+    private var modelStatus: String {
+        if !session.modelMessage.isEmpty { return session.modelMessage }
+        let provider = session.catalog?.providers.first { $0.id == session.settings.agentProvider.rawValue }
+        return provider?.ready == false ? provider?.message ?? "モデル一覧を更新してください" : ""
+    }
 }

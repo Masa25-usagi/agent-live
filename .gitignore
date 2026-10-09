@@ -7,6 +7,14 @@ auth.json
 connection.json
 *credentials*.json
 *client_secret*.json
+*pairing*.json
+token.json
+google-token.json
+provider-keys.json
+server.env
+model-catalog.json
+agentlive-connection.json
+*.xcuserstate
 *.pem
 *.key
 *.p12
