@@ -126,7 +126,7 @@ struct ConnectionSettingsView: View {
                 } header: { Text("詳細") }
             }.navigationTitle("設定").toolbar { Button("完了") { session.saveSettings(); dismiss() } }
                 .task { await session.loadModels() }
-        }.frame(minWidth: 320, minHeight: 460).preferredColorScheme(.dark)
+        }.frame(minWidth: 320, minHeight: 460)
     }
     private var recordingSettings: some View {
         Form {
@@ -144,9 +144,9 @@ struct ConnectionSettingsView: View {
                 TextField("接続先", text: $session.settings.endpoint).disabled(session.recording || session.agentBusy)
                 SecureField("接続キー、またはMacの接続情報", text: $token).disabled(session.recording || session.agentBusy)
                 Button("接続を確認") { session.saveSettings(); Task { if token.isEmpty { await session.checkConnection() } else { await session.pair(token: token); token = "" } } }.disabled(session.agentBusy)
-                Label(session.health["agent"] == true ? "Hermesに接続済み" : "Hermesを確認してください", systemImage: "brain")
-                Label(session.health["drive"] == true ? "Drive保存を利用できます" : "Driveの認証が必要です", systemImage: "externaldrive")
-                Label(session.health["jev"] == true ? "Jevに接続済み" : "Jevの接続を確認してください", systemImage: "sparkles")
+                healthRow(session.health["agent"] == true, ok: "Hermesに接続済み", action: "Hermesを確認してください", icon: "brain")
+                healthRow(session.health["drive"] == true, ok: "Drive保存を利用できます", action: "Driveの認証が必要です", icon: "externaldrive")
+                healthRow(session.health["jev"] == true, ok: "Jevに接続済み", action: "Jevの接続を確認してください", icon: "sparkles")
                 #if os(macOS)
                 Button("iPhone用の接続情報をコピー") {
                     if let secret = DeviceCredential.read(), let data = try? JSONSerialization.data(withJSONObject: ["endpoint": session.settings.endpoint, "token": secret,
@@ -176,7 +176,14 @@ struct ConnectionSettingsView: View {
         }.navigationTitle("接続")
     }
     private func settingRow(_ label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) { Text(label); Text(value).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+        VStack(alignment: .leading, spacing: 4) { Text(label); Text(value).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+    }
+    private func healthRow(_ connected: Bool, ok: String, action: String, icon: String) -> some View {
+        Label {
+            Text(connected ? ok : action)
+        } icon: {
+            Image(systemName: icon).foregroundStyle(connected ? Color.green : Color.orange)
+        }.accessibilityElement(children: .combine)
     }
     private func criteria(_ title: String, _ values: [String]) -> some View {
         VStack(alignment: .leading, spacing: 8) { Text(title).font(.subheadline.bold()); ForEach(values, id: \.self) { Text("• " + $0).font(.caption) } }
