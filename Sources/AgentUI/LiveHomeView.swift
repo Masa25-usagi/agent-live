@@ -29,6 +29,8 @@ public struct LiveHomeView: View {
     }
     private let ink = Color(red: 0.91, green: 0.93, blue: 1)
     private let accent = Color(red: 0.6, green: 0.69, blue: 1)
+    private let stageBackground = Color(red: 0.035, green: 0.043, blue: 0.065)
+    private let cardCornerRadius: CGFloat = 22
     public var body: some View {
         VStack(spacing: 0) {
             header
@@ -45,28 +47,29 @@ public struct LiveHomeView: View {
                                         Spacer(); Image(systemName: "text.bubble").font(.caption).foregroundStyle(ink.opacity(0.45))
                                     }
                                     Text(row.text).font(.body).lineLimit(4).frame(maxWidth: .infinity, alignment: .leading)
-                                }.padding(18).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 22))
+                                }.padding(18).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: cardCornerRadius))
                             }.buttonStyle(.plain).accessibilityLabel("文字起こしを開く。" + row.text)
                         }
                         if let proposal = session.proposal {
                             VStack(alignment: .leading, spacing: 12) {
                                 Label("Hermesへの依頼", systemImage: "sparkles").font(.caption).foregroundStyle(accent)
                                 Text(proposal.task).lineLimit(4)
-                                HStack { Button("開始") { session.approveWork(); showWorkspace = true }.buttonStyle(.borderedProminent); Button("今はしない") { session.dismissWork() } }
-                            }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 22))
+                                HStack(spacing: 8) { Button("開始") { session.approveWork(); showWorkspace = true }.buttonStyle(.borderedProminent); Button("今はしない") { session.dismissWork() }.buttonStyle(.bordered) }
+                            }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: cardCornerRadius))
                         }
                         if let error = session.error {
-                            HStack(alignment: .top, spacing: 9) {
+                            HStack(alignment: .top, spacing: 8) {
                                 Image(systemName: "exclamationmark.circle")
                                 Text(error).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
                             }.foregroundStyle(.orange).padding(14).background(.orange.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+                            .accessibilityElement(children: .combine).accessibilityLabel("エラー。\(error)")
                         }
                     }.frame(maxWidth: .infinity).padding(.horizontal, 22).padding(.bottom, 14)
                 }.scrollIndicators(.hidden)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { controlBar }
-        .foregroundStyle(ink).background(Color(red: 0.035, green: 0.043, blue: 0.065)).preferredColorScheme(.dark)
+        .foregroundStyle(ink).background(stageBackground).preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) { ConnectionSettingsView(session: session, legacy: legacy) }
         .sheet(isPresented: $showTimeline) {
             NavigationStack { ScrollView { LazyVStack(alignment: .leading, spacing: 20) {
@@ -174,6 +177,7 @@ public struct LiveHomeView: View {
             if showComposer {
                 HStack {
                     TextField("文字でも話しかける", text: $message).textFieldStyle(.plain).onSubmit { submit() }
+                        .accessibilityLabel("文字のメッセージ入力")
                     Button { submit() } label: { Image(systemName: "arrow.up.circle.fill").font(.title2).foregroundStyle(accent).frame(width: 44, height: 44) }.disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityLabel("送信")
                 }.padding(.leading, 15).padding(.trailing, 6).background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 20))
             }
@@ -182,7 +186,7 @@ public struct LiveHomeView: View {
                     Button { Task { await session.toggleConversation() } } label: {
                         VStack(spacing: 4) {
                             Image(systemName: session.settings.liveConversation ? "speaker.wave.2" : "speaker.slash").font(.system(size: 19))
-                            Text(session.settings.liveConversation ? "声オン" : "声オフ").font(.system(size: 10))
+                            Text(session.settings.liveConversation ? "声オン" : "声オフ").font(.caption2)
                         }.frame(width: 58, height: 58)
                     }.buttonStyle(.plain).background(.white.opacity(0.09), in: Circle()).accessibilityLabel(session.settings.liveConversation ? "声の返答をオフにする。文字の返答と記録は続きます" : "声の返答をオンにする")
                 }
@@ -195,7 +199,7 @@ public struct LiveHomeView: View {
                 }
             }
             Text(session.agentBusy ? "Hermesが作業中 · 会話は続けられます" : session.syncStatus).font(.caption2).foregroundStyle(ink.opacity(0.45)).lineLimit(2)
-        }.padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 12).background(Color(red: 0.035, green: 0.043, blue: 0.065))
+        }.padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 12).background(stageBackground)
     }
     private func mediaButton(_ icon: String, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {

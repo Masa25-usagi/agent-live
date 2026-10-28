@@ -35,7 +35,10 @@ struct ModelSelectionView: View {
             if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary) }
             if !defaultLabel.isEmpty, search.isEmpty { row(id: "", title: defaultLabel) }
             ForEach(visible) { model in row(id: model.id, title: model.title) }
-            if visible.isEmpty { Text("該当するモデルがありません").foregroundStyle(.secondary) }
+            if visible.isEmpty {
+                Label("該当するモデルがありません", systemImage: "magnifyingglass")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
         }
         .searchable(text: $search, prompt: "モデル名を検索")
         .navigationTitle(title)
@@ -54,6 +57,6 @@ struct ModelSelectionView: View {
                 Text(title).font(.body).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "checkmark").foregroundStyle(.tint).opacity(selected == id ? 1 : 0)
             }.padding(.vertical, 6).contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityAddTraits(selected == id ? .isSelected : [])
+        }.buttonStyle(.plain).accessibilityAddTraits(selected == id ? .isSelected : []).accessibilityHint("選択して閉じます")
     }
 }
